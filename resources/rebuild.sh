@@ -251,6 +251,27 @@ function build_al_kernels {
     fi
 }
 
+function build_docker_kernel {
+    clone_amazon_linux_repo
+
+    CI_CONFIG="$PWD/guest_configs/ci.config"
+    DOCKER_CONFIG="$PWD/guest_configs/docker.config"
+
+    DOCKER_OUTPUT_DIR=$OUTPUT_DIR/docker
+    mkdir -pv $DOCKER_OUTPUT_DIR
+
+    local ORIG_OUTPUT_DIR=$OUTPUT_DIR
+    OUTPUT_DIR=$DOCKER_OUTPUT_DIR
+
+    if [ $ARCH = "x86_64" ]; then
+        build_al_kernel "$PWD/guest_configs/microvm-kernel-ci-$ARCH-6.1.config" "$CI_CONFIG" "$DOCKER_CONFIG"
+    else
+        die "Docker kernel build is only supported on x86_64"
+    fi
+
+    OUTPUT_DIR=$ORIG_OUTPUT_DIR
+}
+
 function print_help {
     cat <<EOF
 Firecracker CI artifacts build script
@@ -275,6 +296,11 @@ Available commands:
         version: Optionally choose a kernel version to build. Supported
                  versions are: 5.10, 5.10-no-acpi or 6.1.
 
+    docker
+        Builds a Docker-capable guest kernel (x86_64 only, kernel 6.1)
+        with additional networking, netfilter, and container features
+        enabled via the docker.config overlay.
+
     help
         Displays the help message and exits.
 EOF
@@ -285,7 +311,7 @@ function main {
         local MODE="all"
     else
         case $1 in
-            all|rootfs|kernels)
+            all|rootfs|kernels|docker)
                 local MODE=$1
                 shift
                 ;;
@@ -313,6 +339,11 @@ function main {
     if [[ "$MODE" =~ (all|kernels) ]]; then
         say "Building CI kernels"
         build_al_kernels "$@"
+    fi
+
+    if [[ "$MODE" == "docker" ]]; then
+        say "Building Docker-capable kernel"
+        build_docker_kernel
     fi
 
     tree -h $OUTPUT_DIR
